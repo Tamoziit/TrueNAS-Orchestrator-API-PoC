@@ -41,6 +41,12 @@ public class SmbFileClient {
     public void upload(String relativePath, MultipartFile file) throws IOException {
         SmbFile target = resolve(relativePath);
 
+        try (SmbFile parentDir = new SmbFile(target.getParent(), cifsContext)) {
+            if (!parentDir.exists()) {
+                parentDir.mkdirs();
+            }
+        }
+
         try (InputStream inputStream = file.getInputStream();
              OutputStream outputStream = new SmbFileOutputStream(target)) {
             inputStream.transferTo(outputStream);
@@ -59,9 +65,13 @@ public class SmbFileClient {
     }
 
     public List<FileEntry> list(String relativePath) throws IOException {
+        String dirPath = relativePath.isEmpty() || relativePath.endsWith("/")
+            ? relativePath
+            : relativePath + "/";
+
         List<FileEntry> entries = new ArrayList<>();
 
-        try (SmbFile dir = resolve(relativePath)) {
+        try (SmbFile dir = resolve(dirPath)) {
             for (SmbFile file : dir.listFiles()) {
                 try (file) {
                     entries.add(new FileEntry(

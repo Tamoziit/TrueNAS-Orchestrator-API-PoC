@@ -26,12 +26,26 @@ public class StorageBoostrapService {
     @Value("${smb.bootstrap.share-name}")
     private String shareName;
 
+    @Value("${smb.username}")
+    private String smbUsername;
+
+    @Value("${smb.full-name}")
+    private String smbFullName;
+
+    @Value("${smb.password}")
+    private String smbPassword;
+
     public StorageBoostrapService(TrueNasStorageClient trueNasStorageClient) {
         this.trueNasStorageClient = trueNasStorageClient;
     }
 
     @PostConstruct
     public void provisionBaselineStorage() {
+        if (!trueNasStorageClient.userExists(smbUsername)) {
+            log.info("Creating Baseline storage for user {}", smbUsername);
+            trueNasStorageClient.createUser(smbUsername, smbFullName, smbPassword);
+        }
+
         if (!trueNasStorageClient.poolExists(poolName)) {
             log.info("Creating pool {}", poolName);
             trueNasStorageClient.createPool(poolName, diskIdentifier);
@@ -51,6 +65,6 @@ public class StorageBoostrapService {
         }
         trueNasStorageClient.startService("cifs");
 
-        log.info("Baseline SMB storage provisioned: pool={}, dataset={}, share={}", poolName, datasetName, shareName);
+        log.info("Baseline SMB storage provisioned: user={}, pool={}, dataset={}, share={}", smbUsername, poolName, datasetName, shareName);
     }
 }

@@ -73,4 +73,19 @@ public class TrueNasStorageClient {
 
         trueNasApiClient.post("/api/v2.0/filesystem/setperm", body);
     }
+
+    public boolean userExists(String username) {
+        return trueNasApiClient.get("/api/v2.0/user").stream()
+            .anyMatch(user -> username.equals(user.get("username")));
+    }
+
+    public void createUser(String username, String fullName, String password) {
+        trueNasApiClient.post("/api/v2.0/user", Map.of(
+            "username", username,
+            "full_name", fullName,
+            "password", password,
+            "group_create", true,
+            "smb", true
+        ));
+    }
 }
