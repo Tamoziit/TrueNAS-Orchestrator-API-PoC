@@ -30,10 +30,18 @@ public class FileService {
         return smbFileClient.download(path);
     }
 
+    public InputStream preview(String path) throws IOException {
+        return smbFileClient.download(path);
+    }
+
     public FileListResponse list(String path) throws IOException {
         return new FileListResponse(
             path,
             smbFileClient.list(path)
         );
+    }
+
+    public void delete(String path) throws IOException {
+        smbFileClient.delete(path);
     }
 }

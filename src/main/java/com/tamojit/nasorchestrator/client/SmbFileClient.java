@@ -86,4 +86,36 @@ public class SmbFileClient {
 
         return entries;
     }
+
+    public void delete(String relativePath) throws IOException {
+        String cleanPath = relativePath.startsWith("/") ? relativePath.substring(1) : relativePath;
+
+        if (cleanPath.isEmpty()) {
+            throw new IllegalArgumentException("Cannot delete the root folder");
+        }
+
+        try (SmbFile target = resolve(relativePath)) {
+            if (!target.exists()) {
+                throw new FileNotFoundException("Not found on NAS: " + relativePath);
+            }
+
+            deleteRecursively(target);
+        }
+    }
+
+    private void deleteRecursively(SmbFile file) throws IOException {
+        if (file.isDirectory()) {
+            String path = file.getPath();
+
+            try (SmbFile dir = path.endsWith("/") ? file : new SmbFile(path + "/", cifsContext)) {
+                for (SmbFile child : dir.listFiles()) {
+                    try (child) {
+                        deleteRecursively(child);
+                    }
+                }
+            }
+        }
+
+        file.delete();
+    }
 }

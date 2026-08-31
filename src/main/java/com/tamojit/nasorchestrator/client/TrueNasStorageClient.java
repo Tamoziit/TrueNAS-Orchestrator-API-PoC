@@ -27,7 +27,8 @@ public class TrueNasStorageClient {
                     "type", "STRIPE",
                     "disks", List.of(diskIdentifier)
                 ))
-            )
+            ),
+            "allow_duplicate_serials", true
         ));
     }
 
