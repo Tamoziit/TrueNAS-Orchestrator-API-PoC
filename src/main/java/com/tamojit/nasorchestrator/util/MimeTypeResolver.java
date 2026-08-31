@@ -16,8 +16,9 @@ public class MimeTypeResolver {
         Map.entry("webp", MediaType.parseMediaType("image/webp")),
         Map.entry("svg", MediaType.parseMediaType("image/svg+xml")),
         Map.entry("pdf", MediaType.APPLICATION_PDF),
+        Map.entry("en", MediaType.APPLICATION_PDF),
         Map.entry("txt", MediaType.TEXT_PLAIN),
-        Map.entry("md", MediaType.TEXT_PLAIN),
+        Map.entry("md", MediaType.parseMediaType("text/markdown")),
         Map.entry("csv", MediaType.parseMediaType("text/csv")),
         Map.entry("json", MediaType.APPLICATION_JSON)
     );

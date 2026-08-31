@@ -1,11 +1,15 @@
 package com.tamojit.nasorchestrator.client;
 
 import com.tamojit.nasorchestrator.dto.FileEntry;
+import jakarta.servlet.http.HttpServletResponse;
 import jcifs.CIFSContext;
 import jcifs.smb.SmbFile;
 import jcifs.smb.SmbFileInputStream;
 import jcifs.smb.SmbFileOutputStream;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -15,6 +19,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 @Component
 public class SmbFileClient {
@@ -38,8 +44,17 @@ public class SmbFileClient {
         return new SmbFile(shareBaseUrl + cleanPath, cifsContext);
     }
 
-    public void upload(String relativePath, MultipartFile file) throws IOException {
-        SmbFile target = resolve(relativePath);
+    public void upload(String relativeDirPath, MultipartFile file) throws IOException {
+        String originalFilename = file.getOriginalFilename();
+        if (originalFilename == null || originalFilename.isBlank()) {
+            throw new IllegalArgumentException("Uploaded file has no name");
+        }
+        if (originalFilename.contains("..") || originalFilename.contains("/") || originalFilename.contains("\\")) {
+            throw new IllegalArgumentException("Invalid filename: " + originalFilename);
+        }
+
+        String dirPath = relativeDirPath.endsWith("/") ? relativeDirPath : relativeDirPath + "/";
+        SmbFile target = resolve(dirPath + originalFilename);
 
         try (SmbFile parentDir = new SmbFile(target.getParent(), cifsContext)) {
             if (!parentDir.exists()) {
@@ -53,15 +68,17 @@ public class SmbFileClient {
         }
     }
 
-    public InputStream download(String relativePath) throws IOException {
-        SmbFile target = resolve(relativePath);
-
-        if (!target.exists()) {
-            target.close();
-            throw new FileNotFoundException("Not found on NAS: " + relativePath);
+    public void download(String relativePath, HttpServletResponse response) throws IOException {
+        try (SmbFile target = resolve(relativePath)) {
+            if (!target.exists()) {
+                throw new FileNotFoundException("File not found: " + relativePath);
+            }
+            if (target.isDirectory()) {
+                downloadAsZip(target, response);
+            } else {
+                downloadFile(target, response);
+            }
         }
-
-        return new SmbFileInputStream(target);
     }
 
     public List<FileEntry> list(String relativePath) throws IOException {
@@ -87,6 +104,17 @@ public class SmbFileClient {
         return entries;
     }
 
+    public InputStream preview(String relativePath) throws IOException {
+        SmbFile target = resolve(relativePath);
+
+        if (!target.exists()) {
+            target.close();
+            throw new FileNotFoundException("Not found on NAS: " + relativePath);
+        }
+
+        return new SmbFileInputStream(target);
+    }
+
     public void delete(String relativePath) throws IOException {
         String cleanPath = relativePath.startsWith("/") ? relativePath.substring(1) : relativePath;
 
@@ -100,6 +128,50 @@ public class SmbFileClient {
             }
 
             deleteRecursively(target);
+        }
+    }
+
+    private void downloadFile(SmbFile target, HttpServletResponse response) throws IOException {
+        response.setContentType(MediaType.APPLICATION_OCTET_STREAM_VALUE);
+        response.setHeader(HttpHeaders.CONTENT_DISPOSITION,
+            ContentDisposition.attachment().filename(target.getName()).build().toString());
+
+        try (InputStream inputStream = new SmbFileInputStream(target)) {
+            inputStream.transferTo(response.getOutputStream());
+        }
+    }
+
+    private void downloadAsZip(SmbFile dir, HttpServletResponse response) throws IOException {
+        String zipName = dir.getName().replaceAll("/$", "") + ".zip";
+        response.setContentType("application/zip");
+        response.setHeader(HttpHeaders.CONTENT_DISPOSITION,
+            ContentDisposition.attachment().filename(zipName).build().toString());
+
+        try (ZipOutputStream zos = new ZipOutputStream(response.getOutputStream())) {
+            zipRecursively(dir, "", zos);
+        }
+    }
+
+    private void zipRecursively(SmbFile dir, String basePath, ZipOutputStream zos) throws IOException {
+        String path = dir.getPath();
+
+        try (SmbFile listableDir = path.endsWith("/") ? dir : new SmbFile(path + "/", cifsContext)) {
+            for (SmbFile child : listableDir.listFiles()) {
+                try (child) {
+                    String entryPath = basePath + child.getName();
+
+                    if (child.isDirectory()) {
+                        zipRecursively(child, entryPath, zos);
+                    } else {
+                        zos.putNextEntry(new ZipEntry(entryPath));
+                        try (InputStream in = new SmbFileInputStream(child)) {
+                            in.transferTo(zos);
+                        }
+
+                        zos.closeEntry();
+                    }
+                }
+            }
         }
     }
 

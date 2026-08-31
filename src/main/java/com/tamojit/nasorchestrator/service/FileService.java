@@ -3,6 +3,7 @@ package com.tamojit.nasorchestrator.service;
 import com.tamojit.nasorchestrator.client.SmbFileClient;
 import com.tamojit.nasorchestrator.dto.FileListResponse;
 import com.tamojit.nasorchestrator.dto.FileUploadResponse;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -19,19 +20,22 @@ public class FileService {
 
     public FileUploadResponse upload(String path, MultipartFile file) throws IOException {
         smbFileClient.upload(path, file);
+        String dirPath = path.endsWith("/") ? path : path + "/";
+        String storedPath = dirPath + file.getOriginalFilename();
+
         return new FileUploadResponse(
-            path,
+            storedPath,
             file.getSize(),
             "uploaded"
         );
     }
 
-    public InputStream download(String path) throws IOException {
-        return smbFileClient.download(path);
+    public void download(String path, HttpServletResponse response) throws IOException {
+        smbFileClient.download(path, response);
     }
 
     public InputStream preview(String path) throws IOException {
-        return smbFileClient.download(path);
+        return smbFileClient.preview(path);
     }
 
     public FileListResponse list(String path) throws IOException {

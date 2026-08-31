@@ -4,6 +4,7 @@ import com.tamojit.nasorchestrator.dto.FileListResponse;
 import com.tamojit.nasorchestrator.dto.FileUploadResponse;
 import com.tamojit.nasorchestrator.service.FileService;
 import com.tamojit.nasorchestrator.util.MimeTypeResolver;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import org.springframework.core.io.InputStreamResource;
@@ -45,21 +46,23 @@ public class FileController {
     }
 
     @GetMapping("/download")
-    public ResponseEntity<InputStreamResource> download(
+    public void download(
         @RequestParam("path")
         @NotBlank(message = "Path is required")
         @Pattern(regexp = NO_TRAVERSAL_REGEX, message = NO_TRAVERSAL_MSG)
         @Pattern(regexp = NO_BACKSLASH_REGEX, message = NO_BACKSLASH_MSG)
-        String path
+        String path,
+        HttpServletResponse response
     ) throws IOException {
-        InputStream inputStream = fileService.download(path);
-        String filename = path.substring(path.lastIndexOf('/') + 1);
-
-        return ResponseEntity.ok()
-            .contentType(MediaType.APPLICATION_OCTET_STREAM)
-            .header(HttpHeaders.CONTENT_DISPOSITION,
-                ContentDisposition.attachment().filename(filename).build().toString()) // download to local file path
-            .body(new InputStreamResource(inputStream));
+//        InputStream inputStream = fileService.download(path);
+//        String filename = path.substring(path.lastIndexOf('/') + 1);
+//
+//        return ResponseEntity.ok()
+//            .contentType(MediaType.APPLICATION_OCTET_STREAM)
+//            .header(HttpHeaders.CONTENT_DISPOSITION,
+//                ContentDisposition.attachment().filename(filename).build().toString()) // download to local file path
+//            .body(new InputStreamResource(inputStream));
+        fileService.download(path, response);
     }
 
     @GetMapping("/preview")
