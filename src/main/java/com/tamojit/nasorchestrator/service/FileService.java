@@ -3,12 +3,16 @@ package com.tamojit.nasorchestrator.service;
 import com.tamojit.nasorchestrator.client.SmbFileClient;
 import com.tamojit.nasorchestrator.dto.FileListResponse;
 import com.tamojit.nasorchestrator.dto.FileUploadResponse;
+import com.tamojit.nasorchestrator.dto.FileUploadResult;
+import com.tamojit.nasorchestrator.dto.FolderUploadResponse;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
 
 @Service
 public class FileService {
@@ -47,5 +51,34 @@ public class FileService {
 
     public void delete(String path) throws IOException {
         smbFileClient.delete(path);
+    }
+
+    public FolderUploadResponse uploadFolder(String path, MultipartFile[] files, String[] relativePaths) {
+        if (files.length != relativePaths.length) {
+            throw new IllegalArgumentException("files and relativePaths must be the same length");
+        }
+
+        List<FileUploadResult> results = new ArrayList<>();
+        int successCount = 0;
+
+        for (int i = 0; i < files.length; i++) {
+            String relPath = relativePaths[i];
+
+            try {
+                smbFileClient.uploadToRelativePath(path, relPath, files[i]);
+                results.add(new FileUploadResult(relPath, true, "uploaded"));
+                successCount++;
+            } catch (Exception e) {
+                results.add(new FileUploadResult(relPath, false, e.getMessage()));
+            }
+        }
+
+        return new FolderUploadResponse(
+            path,
+            files.length,
+            successCount,
+            files.length - successCount,
+            results
+        );
     }
 }

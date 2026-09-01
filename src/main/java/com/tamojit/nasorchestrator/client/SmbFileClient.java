@@ -190,4 +190,26 @@ public class SmbFileClient {
 
         file.delete();
     }
+
+    public void uploadToRelativePath(String baseDirPath, String relativePath, MultipartFile file) throws IOException {
+        if (relativePath == null || relativePath.isBlank()
+            || relativePath.contains("..") || relativePath.contains("\\")) {
+            throw new IllegalArgumentException("Invalid relative path: " + relativePath);
+        }
+
+        String cleanRelative = relativePath.startsWith("/") ? relativePath.substring(1) : relativePath;
+        String baseDir = baseDirPath.endsWith("/") ? baseDirPath : baseDirPath + "/";
+        SmbFile target = resolve(baseDir + cleanRelative);
+
+        try (SmbFile parentDir = new SmbFile(target.getParent(), cifsContext)) {
+            if (!parentDir.exists()) {
+                parentDir.mkdirs();
+            }
+        }
+
+        try (InputStream inputStream = file.getInputStream();
+             OutputStream outputStream = new SmbFileOutputStream(target)) {
+            inputStream.transferTo(outputStream);
+        }
+    }
 }

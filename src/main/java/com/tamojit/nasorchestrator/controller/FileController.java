@@ -2,6 +2,7 @@ package com.tamojit.nasorchestrator.controller;
 
 import com.tamojit.nasorchestrator.dto.FileListResponse;
 import com.tamojit.nasorchestrator.dto.FileUploadResponse;
+import com.tamojit.nasorchestrator.dto.FolderUploadResponse;
 import com.tamojit.nasorchestrator.service.FileService;
 import com.tamojit.nasorchestrator.util.MimeTypeResolver;
 import jakarta.servlet.http.HttpServletResponse;
@@ -33,8 +34,8 @@ public class FileController {
         this.mimeTypeResolver = mimeTypeResolver;
     }
 
-    @PostMapping("/upload")
-    public ResponseEntity<FileUploadResponse> upload(
+    @PostMapping("/upload/file")
+    public ResponseEntity<FileUploadResponse> uploadFile(
         @RequestParam("path")
         @NotBlank(message = "Path is required")
         @Pattern(regexp = NO_TRAVERSAL_REGEX, message = NO_TRAVERSAL_MSG)
@@ -43,6 +44,19 @@ public class FileController {
         @RequestParam("file") MultipartFile file
     ) throws IOException {
         return ResponseEntity.ok(fileService.upload(path, file));
+    }
+
+    @PostMapping("/upload/folder")
+    public ResponseEntity<FolderUploadResponse> uploadFolder(
+        @RequestParam("path")
+        @NotBlank(message = "Path is required")
+        @Pattern(regexp = NO_TRAVERSAL_REGEX, message = NO_TRAVERSAL_MSG)
+        @Pattern(regexp = NO_BACKSLASH_REGEX, message = NO_BACKSLASH_MSG)
+        String path,
+        @RequestParam("files") MultipartFile[] files,
+        @RequestParam("relativePaths") String[] relativePaths
+    ) throws IOException {
+        return ResponseEntity.ok(fileService.uploadFolder(path, files, relativePaths));
     }
 
     @GetMapping("/download")
@@ -54,14 +68,6 @@ public class FileController {
         String path,
         HttpServletResponse response
     ) throws IOException {
-//        InputStream inputStream = fileService.download(path);
-//        String filename = path.substring(path.lastIndexOf('/') + 1);
-//
-//        return ResponseEntity.ok()
-//            .contentType(MediaType.APPLICATION_OCTET_STREAM)
-//            .header(HttpHeaders.CONTENT_DISPOSITION,
-//                ContentDisposition.attachment().filename(filename).build().toString()) // download to local file path
-//            .body(new InputStreamResource(inputStream));
         fileService.download(path, response);
     }
 
