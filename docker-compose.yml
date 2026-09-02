@@ -46,6 +46,30 @@ services:
     networks:
       - antar-network
 
+  # nas-orchestrator
+  nas-orchestrator:
+    build:
+      context: ./nas-orchestrator
+    container_name: nas-orchestrator
+    env_file:
+      - ./nas-orchestrator/.env
+    ports:
+      - "8081:8081"
+    networks:
+      - antar-network
+
+  # video-service
+  video-service:
+    build:
+      context: ./video-service
+    container_name: video-service
+    ports:
+      - "8082:8082"
+    depends_on:
+      - kafka
+    networks:
+      - antar-network
+
 networks:
   antar-network:
     driver: bridge

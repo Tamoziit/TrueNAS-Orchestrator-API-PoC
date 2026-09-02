@@ -12,8 +12,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class VideoUploadedEvent {
     private String movieId;
-    private String videoKey;
-    private String bucketName;
+    private String nasPath;
     private String originalFileName;
     private long fileSizeBytes;
 }
