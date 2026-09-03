@@ -1,6 +1,8 @@
 spring:
   application:
     name: streaming-service
+  config:
+    import: optional:file:.env[.properties]
   data:
     redis:
       host: redis

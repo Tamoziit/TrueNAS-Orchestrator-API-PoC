@@ -69,6 +69,8 @@ services:
     build:
       context: ./video-service
     container_name: video-service
+    env_file:
+      - ./video-service/.env
     ports:
       - "8082:8082"
     depends_on:

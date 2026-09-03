@@ -1,6 +1,8 @@
 spring:
   application:
     name: video-service
+  config:
+    import: optional:file:.env[.properties]
   kafka:
     bootstrap-servers: kafka:29092
     producer:
