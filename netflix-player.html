@@ -31,6 +31,172 @@
             --orange: #f5a623;
         }
 
+        /* ── Divider ─────────────────────────────── */
+        .section-divider {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            width: 100%;
+            max-width: 680px;
+            margin: 28px 0;
+        }
+
+        .section-divider::before,
+        .section-divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
+
+        .section-divider span {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        /* ── Upload panel ────────────────────────── */
+        .upload-panel {
+            width: 100%;
+            max-width: 680px;
+            background: var(--surface);
+            border: 1.5px dashed var(--border);
+            border-radius: 10px;
+            padding: 28px 28px 24px;
+            transition: border-color 0.25s, background 0.25s;
+        }
+
+        .upload-panel.dragover {
+            border-color: var(--red);
+            background: rgba(229, 9, 20, 0.04);
+        }
+
+        .upload-panel-title {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 20px;
+        }
+
+        .upload-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 14px;
+            align-items: stretch;
+        }
+
+        .upload-movie-id {
+            width: 180px;
+            flex-shrink: 0;
+        }
+
+        .file-pick-area {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 16px;
+            background: var(--surface-2);
+            border: 1.5px solid var(--border);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: border-color 0.2s;
+            min-width: 0;
+        }
+
+        .file-pick-area:hover {
+            border-color: var(--text-dim);
+        }
+
+        .file-pick-icon {
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        .file-pick-label {
+            font-size: 13px;
+            color: var(--text-dim);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .file-pick-label.chosen {
+            color: var(--text);
+        }
+
+        #uploadFileInput {
+            display: none;
+        }
+
+        #uploadBtn {
+            padding: 14px 24px;
+            background: var(--surface-3);
+            color: var(--text-muted);
+            border: 1.5px solid var(--border);
+            border-radius: 6px;
+            font-size: 14px;
+            font-family: 'Inter', sans-serif;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.1s;
+            white-space: nowrap;
+            letter-spacing: 0.3px;
+        }
+
+        #uploadBtn.ready {
+            background: var(--red);
+            color: #fff;
+            border-color: var(--red);
+        }
+
+        #uploadBtn.ready:hover {
+            background: var(--red-bright);
+            border-color: var(--red-bright);
+            transform: translateY(-1px);
+        }
+
+        #uploadBtn:disabled {
+            background: var(--surface-3);
+            color: var(--text-dim);
+            border-color: var(--border);
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* ── Progress bar ────────────────────────── */
+        .progress-wrap {
+            height: 4px;
+            background: var(--surface-3);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 2px;
+            display: none;
+        }
+
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--red) 0%, var(--red-bright) 100%);
+            border-radius: 2px;
+            transition: width 0.2s ease;
+        }
+
+        #uploadStatus {
+            font-size: 12px;
+            margin-top: 10px;
+            font-weight: 500;
+            letter-spacing: 0.2px;
+            min-height: 18px;
+        }
+
         body {
             background: var(--bg);
             font-family: 'Inter', sans-serif;
@@ -318,6 +484,35 @@
         <div class="pipeline-node active">▶ browser</div>
     </div>
 
+    <!-- ── Upload Panel ───────────────────────────────────────────────── -->
+    <div class="upload-panel" id="uploadPanel"
+         ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)">
+        <div class="upload-panel-title">📤 Step 1 — Upload Video</div>
+
+        <div class="upload-row">
+            <input type="text" class="upload-movie-id" id="uploadMovieId"
+                   placeholder="Movie ID" autocomplete="off" oninput="refreshUploadBtn()" />
+
+            <div class="file-pick-area" id="filePickArea" onclick="document.getElementById('uploadFileInput').click()">
+                <span class="file-pick-icon">🎬</span>
+                <span class="file-pick-label" id="filePickLabel">Choose or drag a video file…</span>
+            </div>
+
+            <input type="file" id="uploadFileInput" accept="video/*" onchange="onFileChosen(this)" />
+
+            <button id="uploadBtn" onclick="uploadVideo()" disabled>⬆ Upload</button>
+        </div>
+
+        <div class="progress-wrap" id="progressWrap">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+        <div id="uploadStatus"></div>
+    </div>
+
+    <!-- ── Divider ──────────────────────────────────────────────────────── -->
+    <div class="section-divider"><span>then play</span></div>
+
+    <!-- ── Play Panel ───────────────────────────────────────────────────── -->
     <div class="search-container">
         <input type="text" id="movieId" placeholder="Enter Movie ID (e.g. movie-001)"
             onkeypress="if(event.key==='Enter') loadMovie()" autocomplete="off" />
@@ -381,10 +576,122 @@
          * the correct absolute URLs before hls.js ever sees them.
          */
 
-        const STREAMING_BASE = 'http://localhost:8084';
-        const NAS_BASE       = 'http://localhost:8081';
+        const STREAMING_BASE  = 'http://localhost:8084';
+        const NAS_BASE        = 'http://localhost:8081';
+        const VIDEO_SVC_BASE  = 'http://localhost:8082';
 
-        let hlsInstance = null;
+        let hlsInstance   = null;
+        let chosenFile    = null;
+
+        /* ─────────── Upload helpers ─────────── */
+
+        function setUploadStatus(message, type) {
+            const el = document.getElementById('uploadStatus');
+            el.textContent = message;
+            el.className   = 'status-' + type;
+        }
+
+        function refreshUploadBtn() {
+            const btn = document.getElementById('uploadBtn');
+            const hasId   = document.getElementById('uploadMovieId').value.trim().length > 0;
+            const hasFile = chosenFile !== null;
+            const ready   = hasId && hasFile;
+            btn.disabled  = !ready;
+            btn.className = ready ? 'ready' : '';
+        }
+
+        function onFileChosen(input) {
+            chosenFile = input.files[0] || null;
+            const label = document.getElementById('filePickLabel');
+            if (chosenFile) {
+                label.textContent = chosenFile.name;
+                label.classList.add('chosen');
+            } else {
+                label.textContent = 'Choose or drag a video file…';
+                label.classList.remove('chosen');
+            }
+            refreshUploadBtn();
+        }
+
+        /* Drag-and-drop support */
+        function handleDragOver(e) {
+            e.preventDefault();
+            document.getElementById('uploadPanel').classList.add('dragover');
+        }
+
+        function handleDragLeave(e) {
+            document.getElementById('uploadPanel').classList.remove('dragover');
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            document.getElementById('uploadPanel').classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (!file) return;
+            // Reflect in the hidden file input for consistency
+            const dt  = new DataTransfer();
+            dt.items.add(file);
+            document.getElementById('uploadFileInput').files = dt.files;
+            onFileChosen(document.getElementById('uploadFileInput'));
+        }
+
+        function uploadVideo() {
+            const movieId = document.getElementById('uploadMovieId').value.trim();
+            if (!movieId || !chosenFile) return;
+
+            const btn = document.getElementById('uploadBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ Uploading…';
+
+            const progressWrap = document.getElementById('progressWrap');
+            const progressBar  = document.getElementById('progressBar');
+            progressWrap.style.display = 'block';
+            progressBar.style.width = '0%';
+            setUploadStatus('⏳ Uploading…', 'loading');
+
+            const formData = new FormData();
+            formData.append('file', chosenFile);
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', `${VIDEO_SVC_BASE}/api/v1/videos/upload/${encodeURIComponent(movieId)}`);
+
+            xhr.upload.addEventListener('progress', (e) => {
+                if (e.lengthComputable) {
+                    const pct = Math.round((e.loaded / e.total) * 100);
+                    progressBar.style.width = pct + '%';
+                }
+            });
+
+            xhr.addEventListener('load', () => {
+                progressBar.style.width = '100%';
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    setUploadStatus(`✅ Upload complete (HTTP ${xhr.status}) — encoding pipeline triggered.`, 'success');
+                    // Pre-fill the play field for convenience
+                    document.getElementById('movieId').value = movieId;
+                } else {
+                    setUploadStatus(`❌ Upload failed: HTTP ${xhr.status} — ${xhr.statusText}`, 'error');
+                }
+                btn.disabled    = false;
+                btn.textContent = '⬆ Upload';
+            });
+
+            xhr.addEventListener('error', () => {
+                setUploadStatus('❌ Network error — is video-service running on :8082?', 'error');
+                progressBar.style.width = '0%';
+                btn.disabled    = false;
+                btn.textContent = '⬆ Upload';
+            });
+
+            xhr.addEventListener('abort', () => {
+                setUploadStatus('⚠️ Upload aborted.', 'error');
+                btn.disabled    = false;
+                btn.textContent = '⬆ Upload';
+            });
+
+            xhr.send(formData);
+        }
+
+        /* ─────────── Play helpers ─────────── */
 
         function setStatus(message, type) {
             const el = document.getElementById('status');
