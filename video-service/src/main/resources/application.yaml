@@ -16,7 +16,7 @@ server:
 
 nas:
   orchestrator:
-    base-url: http://localhost:8081
+    base-url: http://nas-orchestrator:8081
 
 management:
   endpoints:

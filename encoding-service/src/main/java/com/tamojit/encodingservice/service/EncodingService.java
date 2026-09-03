@@ -1,5 +1,6 @@
 package com.tamojit.encodingservice.service;
 
+import com.tamojit.encodingservice.client.NasOrchestratorClient;
 import com.tamojit.encodingservice.event.VideoEncodedEvent;
 import com.tamojit.encodingservice.event.VideoUploadedEvent;
 import lombok.RequiredArgsConstructor;
@@ -7,10 +8,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
-import software.amazon.awssdk.core.sync.RequestBody;
-import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.GetObjectRequest;
-import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import java.io.File;
 import java.io.IOException;
@@ -19,16 +16,14 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Stream;
 
 @Service
 @Slf4j
 @RequiredArgsConstructor
 public class EncodingService {
-    private final S3Client s3Client;
     private final KafkaTemplate<String, VideoEncodedEvent> kafkaTemplate;
-
-    @Value("${aws.s3.bucket-name}")
-    private String bucketName;
+    private final NasOrchestratorClient nasOrchestratorClient;
 
     @Value("${ffmpeg.path}")
     private String ffmpegPath;
@@ -46,18 +41,7 @@ public class EncodingService {
         new int[]{854, 1200, 480}, // 480p
         new int[]{640, 800, 360} // 360p
     );
-    // higher bitrate: better quality, lower bitrate: lesser quality (but better for low-bandwidth network connections)
 
-    /*
-     * Encoding Pipeline
-     * FLOW:
-     * -> Download raw video from S3
-     * -> Encode to multiple qualities using ffmpeg
-     * -> Generate HLS playlist (.ts segments) for each quality
-     * -> Create master playlist (master.m3u8 playlist) having pointers to segments for each quality
-     * -> Upload all encoded files back to S3
-     * -> Publish video.encoded event to Kafka
-     */
     public void encodeVideo(VideoUploadedEvent event) {
         log.info("Video encoded event received: {}", event.getMovieId());
 
@@ -69,9 +53,9 @@ public class EncodingService {
             Files.createDirectories(Paths.get(jobPath));
             Files.createDirectories(Paths.get(jobPath + "/encoded"));
 
-            // S1: downloading raw file from S3
+            // S1: downloading raw file from NAS
             String localVideoPath = jobPath + "/raw_video.mp4";
-            downloadFromS3(event.getVideoKey(), localVideoPath);
+            nasOrchestratorClient.downloadToFile(event.getVideoPath(), Path.of(localVideoPath));
             log.info("Raw Video downloaded to: {}", localVideoPath);
 
             // S2, S3: Encoding to multiple qualities & generating HLS playlist
@@ -88,23 +72,21 @@ public class EncodingService {
             }
 
             // S4: generating master playlist
-            String masterPlaylistPath = jobPath + "/encoded/master.m3u8";
-            generateMasterPlaylist(masterPlaylistPath);
+            String localMasterPlaylistPath = jobPath + "/encoded/master.m3u8";
+            generateMasterPlaylist(localMasterPlaylistPath);
             log.info("Master playlist generated successfully");
 
-            // S5: uploading all encoded files back to S3
-            String encodedPrefix = "encoded/" + event.getMovieId() + "/";
-            uploadEncodedFilesToS3(jobPath + "/encoded", encodedPrefix);
-            log.info("All encoded files uploaded to S3 successfully");
+            // S5: uploading all encoded files to NAS in one folder upload
+            String encodedBasePath = "encoded/" + event.getMovieId();
+            nasOrchestratorClient.uploadFolder(encodedBasePath, new File(jobPath + "/encoded"));
+            log.info("All encoded files uploaded to NAS successfully");
 
             // S6: publishing video.encoded event
-            String masterPlaylistKey = encodedPrefix + "master.m3u8";
-            String hlsUrl = "https://" + bucketName + ".s3.amazonaws.com/" + masterPlaylistKey;
+            String masterPlaylistPath = encodedBasePath + "/master.m3u8";
 
             VideoEncodedEvent encodedEvent = new VideoEncodedEvent(
                 event.getMovieId(),
-                hlsUrl,
-                masterPlaylistKey,
+                masterPlaylistPath,
                 true,
                 null
             );
@@ -114,10 +96,9 @@ public class EncodingService {
         } catch (Exception e) {
             log.error("Encoding failed for movie: {} - {}", event.getMovieId(), e.getMessage());
 
-            // publishing failure event
+            // publishing failure event (Fixed to 4 args)
             VideoEncodedEvent failureEvent = new VideoEncodedEvent(
                 event.getMovieId(),
-                null,
                 null,
                 false,
                 e.getMessage()
@@ -128,16 +109,6 @@ public class EncodingService {
             // cleanup job
             cleanupTempFiles(jobPath);
         }
-    }
-
-    // download from S3 to local path
-    private void downloadFromS3(String s3Key, String localVideoPath) {
-        GetObjectRequest getObjectRequest = GetObjectRequest.builder()
-            .bucket(bucketName)
-            .key(s3Key)
-            .build();
-
-        s3Client.getObject(getObjectRequest, Paths.get(localVideoPath));
     }
 
     // encoding raw file to separate qualities with ffmpeg
@@ -201,49 +172,25 @@ public class EncodingService {
         Files.writeString(Paths.get(masterPlaylistPath), master.toString());
     }
 
-    // uploading local files to S3
-    private void uploadEncodedFilesToS3(String localDir, String s3Prefix) throws IOException {
-        File directory = new File(localDir);
-        uploadDirectoryToS3(directory, localDir, s3Prefix);
-    }
-
-    private void uploadDirectoryToS3(File dir, String baseDir, String s3Prefix) throws IOException {
-        for (File file : dir.listFiles()) {
-            if (file.isDirectory()) {
-                uploadDirectoryToS3(file, baseDir, s3Prefix);
-            } else {
-                String relativePath = file.getAbsolutePath()
-                    .substring(baseDir.length() + 1)
-                    .replace("\\", "/");
-
-                String s3Key = s3Prefix + relativePath;
-                String contentType = file.getName()
-                    .endsWith(".m3u8") ? "application/x-mpegURL" : "video/MP2T";
-
-                PutObjectRequest putObjectRequest = PutObjectRequest.builder()
-                    .bucket(bucketName)
-                    .key(s3Key)
-                    .contentType(contentType)
-                    .build();
-
-                s3Client.putObject(putObjectRequest, RequestBody.fromFile(file));
-                log.info("Uploaded : {}", s3Key);
-            }
-        }
-    }
-
     // cleanup job after encoding
     private void cleanupTempFiles(String jobPath) {
-        try {
-            Path dirPath = Paths.get(jobPath);
-            if (Files.exists(dirPath)) {
-                Files.walk(dirPath)
-                    .sorted(java.util.Comparator.reverseOrder())
-                    .map(Path::toFile)
-                    .forEach(File::delete);
+        Path dirPath = Paths.get(jobPath);
+        if (!Files.exists(dirPath)) {
+            return;
+        }
 
-                log.info("Cleaned up temp files at path: {}", jobPath);
-            }
+        // Fixed Stream closure & File delete warning
+        try (Stream<Path> pathStream = Files.walk(dirPath)) {
+            pathStream
+                .sorted(java.util.Comparator.reverseOrder())
+                .map(Path::toFile)
+                .forEach(file -> {
+                    if (!file.delete()) {
+                        log.warn("Could not delete temp file: {}", file.getAbsolutePath());
+                    }
+                });
+
+            log.info("Cleaned up temp files at path: {}", jobPath);
         } catch (IOException e) {
             log.warn("Failed to clean up temp files at path: {} - {}", jobPath, e.getMessage());
         }

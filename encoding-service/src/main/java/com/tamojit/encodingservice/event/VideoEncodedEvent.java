@@ -9,8 +9,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class VideoEncodedEvent {
     private String movieId;
-    private String hlsUrl;
-    private String masterPlaylistKey;
+    private String masterPlaylistPath;
     private boolean success;
     private String errorMessage;
 }

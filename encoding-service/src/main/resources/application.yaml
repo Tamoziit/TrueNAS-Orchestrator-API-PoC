@@ -4,7 +4,7 @@ spring:
   config:
     import: optional:file:.env[.properties]
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: kafka:29092
     consumer:
       group-id: encoding-service-group
       auto-offset-reset: earliest
@@ -28,13 +28,9 @@ spring:
 server:
   port: 8083
 
-# AWS Config
-aws:
-  access-key: ${AWS_ACCESS_KEY:your-access-key}
-  secret-key: ${AWS_SECRET_KEY:your-secret-key}
-  region: ${AWS_REGION:your-region}
-  s3:
-    bucket-name: ${AWS_BUCKET_NAME:your-bucket-name}
+nas:
+  orchestrator:
+    base-url: http://nas-orchestrator:8081
 
 # ffmpeg Config
 ffmpeg:
