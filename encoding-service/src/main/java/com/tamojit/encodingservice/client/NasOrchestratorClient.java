@@ -1,8 +1,10 @@
 package com.tamojit.encodingservice.client;
 
+import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -18,7 +20,12 @@ public class NasOrchestratorClient {
     private final RestClient restClient;
 
     public NasOrchestratorClient(@Value("${nas.orchestrator.base-url}") String baseUrl) {
-        this.restClient = RestClient.builder().baseUrl(baseUrl).build();
+        // Apache HC5: FileSystemResource exposes contentLength() so HC5 sends a
+        // proper Content-Length header per file — no heap buffering, no chunked framing.
+        this.restClient = RestClient.builder()
+            .baseUrl(baseUrl)
+            .requestFactory(new HttpComponentsClientHttpRequestFactory(HttpClients.createDefault()))
+            .build();
     }
 
     public void downloadToFile(String relativePath, Path destination) throws IOException {
@@ -37,20 +44,14 @@ public class NasOrchestratorClient {
         Files.write(destination, bytes);
     }
 
+    // One POST per file — mirrors how the S3 SDK worked (one PUT per object).
+    // Avoids bundling all HLS segments into a single multipart body that Tomcat
+    // would have to buffer entirely in heap before any upload could begin.
     public void uploadFolder(String nasBasePath, File localDir) throws IOException {
-        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
-        body.add("path", nasBasePath);
-        collectFiles(localDir, localDir, body);
-
-        restClient.post()
-            .uri("/api/v1/nas-orchestrator/files/upload/folder")
-            .contentType(MediaType.MULTIPART_FORM_DATA)
-            .body(body)
-            .retrieve()
-            .toBodilessEntity();
+        uploadRecursively(nasBasePath, localDir, localDir);
     }
 
-    private void collectFiles(File root, File dir, MultiValueMap<String, Object> body) throws IOException {
+    private void uploadRecursively(String nasBasePath, File root, File dir) throws IOException {
         File[] files = dir.listFiles();
         if (files == null) {
             return;
@@ -58,17 +59,39 @@ public class NasOrchestratorClient {
 
         for (File file : files) {
             if (file.isDirectory()) {
-                collectFiles(root, file, body);
+                uploadRecursively(nasBasePath, root, file);
                 continue;
             }
 
-            String relative = root.toPath()
-                .relativize(file.toPath())
-                .toString()
-                .replace("\\", "/");
+            // e.g. "1080p/segment_000.ts" or "master.m3u8"
+            String destDir = getString(nasBasePath, root, file);
 
-            body.add("relativePaths", relative);
-            body.add("files", new FileSystemResource(file));
+            MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+            body.add("path", destDir);
+            body.add("file", new FileSystemResource(file)); // filename taken from File.getName()
+
+            restClient.post()
+                .uri("/api/v1/nas-orchestrator/files/upload/file")
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .body(body)
+                .retrieve()
+                .toBodilessEntity();
         }
+    }
+
+    private String getString(String nasBasePath, File root, File file) {
+        String relativePath = root.toPath()
+            .relativize(file.toPath())
+            .toString()
+            .replace("\\", "/");
+
+        // Resolve destination directory on the NAS:
+        //   "1080p/segment_000.ts" → destDir = nasBasePath + "/1080p"
+        //   "master.m3u8"          → destDir = nasBasePath
+        int lastSlash = relativePath.lastIndexOf('/');
+        String destDir = lastSlash >= 0
+            ? nasBasePath + "/" + relativePath.substring(0, lastSlash)
+            : nasBasePath;
+        return destDir;
     }
 }
