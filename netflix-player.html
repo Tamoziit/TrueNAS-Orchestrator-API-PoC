@@ -4,8 +4,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Netflix Streaming Demo</title>
+    <title>ANTAR — HLS Streaming PoC</title>
+    <meta name="description" content="HLS streaming proof-of-concept: video-service → encoding-service → NAS Orchestrator → streaming-service → browser">
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap" rel="stylesheet">
     <style>
         * {
             margin: 0;
@@ -13,180 +16,311 @@
             box-sizing: border-box;
         }
 
+        :root {
+            --red: #E50914;
+            --red-bright: #ff1a27;
+            --bg: #0a0a0a;
+            --surface: #141414;
+            --surface-2: #1e1e1e;
+            --surface-3: #2a2a2a;
+            --border: #2e2e2e;
+            --text: #e5e5e5;
+            --text-muted: #999;
+            --text-dim: #555;
+            --green: #46d369;
+            --orange: #f5a623;
+        }
+
         body {
-            background: #141414;
-            font-family: 'Arial', sans-serif;
+            background: var(--bg);
+            font-family: 'Inter', sans-serif;
             min-height: 100vh;
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 40px 20px;
+            padding: 48px 20px 60px;
+            color: var(--text);
+        }
+
+        /* ── Header ─────────────────────────────── */
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
         }
 
         .logo {
-            color: #E50914;
-            font-size: 48px;
-            font-weight: bold;
-            letter-spacing: 3px;
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 6px;
+            text-transform: uppercase;
+            color: var(--text-muted);
             margin-bottom: 10px;
         }
 
-        .subtitle {
-            color: #999;
-            font-size: 14px;
-            margin-bottom: 40px;
-            letter-spacing: 1px;
-        }
-
-        .search-container {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            width: 100%;
-            max-width: 700px;
-        }
-
-        input {
-            flex: 1;
-            padding: 14px 18px;
-            font-size: 16px;
-            border-radius: 5px;
-            border: 2px solid #333;
-            background: #222;
+        .title {
+            font-size: 36px;
+            font-weight: 900;
             color: #fff;
-            outline: none;
-            transition: border-color 0.3s;
+            letter-spacing: -1px;
+            margin-bottom: 8px;
         }
 
-        input:focus {
-            border-color: #E50914;
+        .title span {
+            color: var(--red);
         }
 
-        input::placeholder {
-            color: #666;
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 13px;
+            letter-spacing: 0.5px;
+            font-weight: 300;
         }
 
-        button {
-            padding: 14px 28px;
-            background: #E50914;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: background 0.2s;
+        /* ── Pipeline badge ──────────────────────── */
+        .pipeline {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-dim);
+            letter-spacing: 0.5px;
+            margin-bottom: 40px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .pipeline-node {
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 4px 10px;
+            color: var(--text-muted);
             white-space: nowrap;
         }
 
-        button:hover {
-            background: #f40612;
+        .pipeline-node.active {
+            border-color: var(--red);
+            color: var(--red);
         }
 
-        button:disabled {
-            background: #666;
+        .pipeline-arrow {
+            color: var(--text-dim);
+        }
+
+        /* ── Search ──────────────────────────────── */
+        .search-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+            width: 100%;
+            max-width: 680px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 14px 18px;
+            font-size: 15px;
+            font-family: 'Inter', sans-serif;
+            border-radius: 6px;
+            border: 1.5px solid var(--border);
+            background: var(--surface-2);
+            color: #fff;
+            outline: none;
+            transition: border-color 0.25s;
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--red);
+        }
+
+        input[type="text"]::placeholder {
+            color: var(--text-dim);
+        }
+
+        #playBtn {
+            padding: 14px 28px;
+            background: var(--red);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 15px;
+            font-family: 'Inter', sans-serif;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+            white-space: nowrap;
+            letter-spacing: 0.3px;
+        }
+
+        #playBtn:hover {
+            background: var(--red-bright);
+            transform: translateY(-1px);
+        }
+
+        #playBtn:active {
+            transform: translateY(0);
+        }
+
+        #playBtn:disabled {
+            background: var(--surface-3);
+            color: var(--text-dim);
             cursor: not-allowed;
+            transform: none;
         }
 
+        /* ── Status ──────────────────────────────── */
         #status {
-            font-size: 14px;
-            margin-bottom: 20px;
+            font-size: 13px;
+            margin-bottom: 18px;
             height: 20px;
             text-align: center;
+            font-weight: 500;
+            letter-spacing: 0.2px;
         }
 
-        .status-loading {
-            color: #fff;
-        }
+        .status-loading { color: var(--orange); }
+        .status-success { color: var(--green); }
+        .status-error   { color: var(--red);   }
 
-        .status-success {
-            color: #46d369;
-        }
-
-        .status-error {
-            color: #E50914;
-        }
-
+        /* ── Video ───────────────────────────────── */
         .video-container {
             width: 100%;
             max-width: 900px;
             background: #000;
-            border-radius: 8px;
+            border-radius: 10px;
             overflow: hidden;
-            border: 2px solid #333;
+            border: 1.5px solid var(--border);
+            box-shadow: 0 24px 80px rgba(0,0,0,0.7);
         }
 
         video {
             width: 100%;
             display: block;
-            min-height: 400px;
+            min-height: 420px;
             background: #000;
         }
 
+        /* ── Info box ────────────────────────────── */
         .info-box {
-            margin-top: 20px;
-            background: #222;
-            border-radius: 8px;
-            padding: 20px;
+            margin-top: 24px;
+            background: var(--surface);
+            border: 1.5px solid var(--border);
+            border-radius: 10px;
+            padding: 22px 24px;
             width: 100%;
             max-width: 900px;
             display: none;
         }
 
         .info-box h3 {
-            color: #E50914;
-            margin-bottom: 15px;
-            font-size: 16px;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
         }
 
         .info-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
+            gap: 10px;
+        }
+
+        @media (max-width: 540px) {
+            .info-grid { grid-template-columns: 1fr; }
         }
 
         .info-item {
-            background: #333;
-            padding: 12px;
-            border-radius: 5px;
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            padding: 12px 14px;
+            border-radius: 6px;
         }
 
         .info-label {
-            color: #999;
-            font-size: 11px;
+            color: var(--text-dim);
+            font-size: 10px;
+            font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 4px;
+            letter-spacing: 1.2px;
+            margin-bottom: 5px;
         }
 
         .info-value {
-            color: #fff;
-            font-size: 14px;
+            color: var(--text);
+            font-size: 13px;
             word-break: break-all;
+            font-weight: 400;
         }
 
-        .tech-stack {
-            margin-top: 30px;
-            color: #666;
+        .info-value.mono {
+            font-family: 'Courier New', monospace;
             font-size: 12px;
-            text-align: center;
+            color: var(--green);
         }
 
-        .tech-stack span {
-            color: #E50914;
-            font-weight: bold;
+        /* quality pills rendered by JS */
+        .quality-pills {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-top: 2px;
+        }
+
+        .pill {
+            background: var(--surface-3);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            font-size: 11px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 3px;
+        }
+
+        /* ── Footer ──────────────────────────────── */
+        .footer {
+            margin-top: 36px;
+            color: var(--text-dim);
+            font-size: 11px;
+            text-align: center;
+            line-height: 1.8;
+        }
+
+        .footer span {
+            color: var(--text-muted);
+            font-weight: 600;
         }
     </style>
 </head>
 
 <body>
 
-    <div class="logo">NETFLIX</div>
-    <div class="subtitle">Streaming Platform Demo — Spring Boot + Kafka + AWS S3 + Redis</div>
+    <div class="header">
+        <div class="logo">ANTAR — NAS Orchestrator</div>
+        <h1 class="title">HLS Streaming <span>PoC</span></h1>
+        <p class="subtitle">Spring Boot · Kafka · TrueNAS (SMB) · Redis · FFmpeg</p>
+    </div>
+
+    <!-- Read path: streaming-service (playlist) → nas-orchestrator (segments) -->
+    <div class="pipeline">
+        <div class="pipeline-node">video-service</div>
+        <div class="pipeline-arrow">→</div>
+        <div class="pipeline-node">encoding-service</div>
+        <div class="pipeline-arrow">→</div>
+        <div class="pipeline-node">TrueNAS</div>
+        <div class="pipeline-arrow">→</div>
+        <div class="pipeline-node active">streaming-service</div>
+        <div class="pipeline-arrow">→</div>
+        <div class="pipeline-node active">nas-orchestrator</div>
+        <div class="pipeline-arrow">→</div>
+        <div class="pipeline-node active">▶ browser</div>
+    </div>
 
     <div class="search-container">
-        <input type="text" id="movieId" placeholder="Enter Movie ID (from Content Service)"
-            onkeypress="if(event.key==='Enter') loadMovie()" />
+        <input type="text" id="movieId" placeholder="Enter Movie ID (e.g. movie-001)"
+            onkeypress="if(event.key==='Enter') loadMovie()" autocomplete="off" />
         <button id="playBtn" onclick="loadMovie()">▶ Play</button>
     </div>
 
@@ -197,114 +331,200 @@
     </div>
 
     <div class="info-box" id="infoBox">
-        <h3>📊 Stream Information</h3>
+        <h3>📡 Stream Info</h3>
         <div class="info-grid">
             <div class="info-item">
                 <div class="info-label">Movie ID</div>
-                <div class="info-value" id="infoMovieId">—</div>
+                <div class="info-value mono" id="infoMovieId">—</div>
             </div>
             <div class="info-item">
-                <div class="info-label">Available Qualities</div>
-                <div class="info-value" id="infoQuality">—</div>
+                <div class="info-label">NAS Playlist Path</div>
+                <div class="info-value mono" id="infoNasPath">—</div>
             </div>
             <div class="info-item">
-                <div class="info-label">URL Expires In</div>
-                <div class="info-value" id="infoExpiry">—</div>
+                <div class="info-label">HLS Level</div>
+                <div class="info-value" id="infoLevel">—</div>
             </div>
             <div class="info-item">
-                <div class="info-label">Streaming URL</div>
-                <div class="info-value" id="infoUrl">—</div>
+                <div class="info-label">Playlist Source</div>
+                <div class="info-value" id="infoSource">—</div>
             </div>
         </div>
     </div>
 
-    <div class="tech-stack">
-        Built with <span>Spring Boot</span> · <span>Apache Kafka</span> ·
-        <span>AWS S3</span> · <span>Redis</span> · <span>FFmpeg HLS</span>
+    <div class="footer">
+        Playlist broker: <span>streaming-service :8084</span> →
+        Segments: <span>nas-orchestrator :8081</span> (L1 Caffeine → SMB)
+        <br>
+        Segment URLs rewritten by <span>PlaylistRewriteService</span> — no S3, no presigned URLs
     </div>
 
     <script>
-        var hlsInstance = null;
+        /**
+         * NEW ARCHITECTURE (thin-broker model):
+         *
+         * 1. GET /api/v1/stream/{movieId}
+         *    → streaming-service looks up streaming:playlist:{movieId} from Redis
+         *    → proxies the raw M3U8 from nas-orchestrator/stream/playlist
+         *    → returns raw M3U8 text (Content-Type: application/x-mpegURL)
+         *
+         * 2. hls.js parses the master playlist — variant playlist lines are
+         *    already rewritten to /api/v1/nas-orchestrator/stream/playlist?path=...
+         *
+         * 3. hls.js fetches variant playlists → segment lines are already
+         *    rewritten to /api/v1/nas-orchestrator/stream/segment?path=...
+         *
+         * 4. nas-orchestrator serves segments: L1 Caffeine → (optional L2 Redis) → SMB → TrueNAS
+         *    N+1 prefetch fires on each served segment.
+         *
+         * No xhrSetup override needed — the playlist rewriter already injects
+         * the correct absolute URLs before hls.js ever sees them.
+         */
+
+        const STREAMING_BASE = 'http://localhost:8084';
+        const NAS_BASE       = 'http://localhost:8081';
+
+        let hlsInstance = null;
 
         function setStatus(message, type) {
-            var status = document.getElementById('status');
-            status.textContent = message;
-            status.className = 'status-' + type;
+            const el = document.getElementById('status');
+            el.textContent = message;
+            el.className = 'status-' + type;
         }
 
         function loadMovie() {
-            var movieId = document.getElementById('movieId').value.trim();
-            var playBtn = document.getElementById('playBtn');
+            const movieId = document.getElementById('movieId').value.trim();
+            const playBtn = document.getElementById('playBtn');
 
             if (!movieId) {
                 setStatus('❌ Please enter a Movie ID', 'error');
                 return;
             }
 
-            // Disable button while loading
             playBtn.disabled = true;
             playBtn.textContent = '⏳ Loading...';
-            setStatus('⏳ Fetching stream from Streaming Service...', 'loading');
+            setStatus('⏳ Fetching playlist from streaming-service…', 'loading');
 
-            // Call Streaming Service
-            fetch('http://localhost:8084/api/v1/stream/' + movieId)
-                .then(function (response) {
-                    if (!response.ok) {
-                        throw new Error('Movie not found or not ready for streaming');
+            // Destroy any existing hls.js instance before starting a new one
+            if (hlsInstance) {
+                hlsInstance.destroy();
+                hlsInstance = null;
+            }
+
+            /*
+             * streaming-service returns raw M3U8 text, not JSON.
+             * Content-Type will be application/x-mpegURL.
+             * We create a Blob URL so hls.js can load it directly.
+             */
+            fetch(`${STREAMING_BASE}/api/v1/stream/${encodeURIComponent(movieId)}`)
+                .then(response => {
+                    if (response.status === 404) {
+                        throw new Error(`Movie "${movieId}" not found — has it been encoded yet?`);
                     }
-                    return response.json();
+                    if (!response.ok) {
+                        throw new Error(`streaming-service error: HTTP ${response.status}`);
+                    }
+                    return response.text();
                 })
-                .then(function (data) {
-                    setStatus('✅ Stream loaded! Playing in ' + data.quality, 'success');
-                    updateInfoBox(data);
-                    playHLS(data.streamingURL);
+                .then(m3u8Text => {
+                    setStatus('✅ Playlist received — starting HLS playback…', 'success');
+                    updateInfoBox(movieId, m3u8Text);
+                    playHLS(m3u8Text, movieId);
 
                     playBtn.disabled = false;
                     playBtn.textContent = '▶ Play';
                 })
-                .catch(function (error) {
+                .catch(error => {
                     setStatus('❌ ' + error.message, 'error');
                     playBtn.disabled = false;
                     playBtn.textContent = '▶ Play';
                 });
         }
 
-        function playHLS(streamUrl) {
-            var video = document.getElementById('video');
+        function playHLS(m3u8Text, movieId) {
+            const video = document.getElementById('video');
+
+            /*
+             * Variant playlist lines look like:
+             *   /api/v1/nas-orchestrator/stream/playlist?path=encoded/{movieId}/720p/playlist.m3u8
+             *
+             * Segment lines inside variant playlists look like:
+             *   /api/v1/nas-orchestrator/stream/segment?path=encoded/{movieId}/720p/segment_000.ts
+             *
+             * These are root-relative paths — we prepend the NAS host so hls.js
+             * resolves them correctly when the page is opened as a local file.
+             */
+            const absoluteM3u8 = m3u8Text.replace(
+                /^(\/api\/v1\/nas-orchestrator\/)/gm,
+                `${NAS_BASE}$1`
+            );
+
+            const blob = new Blob([absoluteM3u8], { type: 'application/x-mpegURL' });
+            const blobUrl = URL.createObjectURL(blob);
 
             if (Hls.isSupported()) {
-                var hls = new Hls({
-                    // Override URL loader to route through our signing endpoint
-                    xhrSetup: function (xhr, url) {
-                        // If this is an m3u8 request — route through our signing endpoint
-                        if (url.includes('.m3u8') && !url.includes('X-Amz')) {
-                            var movieId = document.getElementById('movieId').value;
-                            var encodedPath = encodeURIComponent(
-                                url.split('.amazonaws.com/')[1]
-                            );
-                            xhr.open('GET',
-                                'http://localhost:8084/api/v1/stream/' +
-                                movieId + '/playlist?path=' + encodedPath
-                            );
-                        }
+                hlsInstance = new Hls({
+                    // No xhrSetup override needed — all URLs already point at nas-orchestrator
+                    debug: false,
+                    enableWorker: true,
+                    lowLatencyMode: false,
+                    backBufferLength: 90,
+                });
+
+                hlsInstance.loadSource(blobUrl);
+                hlsInstance.attachMedia(video);
+
+                hlsInstance.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
+                    document.getElementById('infoLevel').textContent =
+                        `${data.levels.length} quality level(s) detected`;
+                    video.play().catch(() => {
+                        // autoplay blocked — user can press play
+                    });
+                });
+
+                hlsInstance.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
+                    const level = hlsInstance.levels[data.level];
+                    if (level) {
+                        document.getElementById('infoLevel').textContent =
+                            `${level.height}p @ ${Math.round(level.bitrate / 1000)} kbps`;
                     }
                 });
 
-                hls.loadSource(streamUrl);
-                hls.attachMedia(video);
-                hls.on(Hls.Events.MANIFEST_PARSED, function () {
-                    video.play();
+                hlsInstance.on(Hls.Events.ERROR, (event, data) => {
+                    if (data.fatal) {
+                        setStatus('❌ HLS fatal error: ' + data.details, 'error');
+                    }
                 });
+
+            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                // Safari native HLS — set src directly; blob URLs work here too
+                video.src = blobUrl;
+                video.play().catch(() => {});
+            } else {
+                setStatus('❌ HLS not supported in this browser', 'error');
             }
         }
 
-        function updateInfoBox(data) {
+        function updateInfoBox(movieId, m3u8Text) {
             document.getElementById('infoBox').style.display = 'block';
-            document.getElementById('infoMovieId').textContent = data.movieId;
-            document.getElementById('infoQuality').textContent = data.quality;
-            document.getElementById('infoExpiry').textContent = data.expiredInMinutes + ' minutes';
-            document.getElementById('infoUrl').textContent =
-                data.streamingURL.substring(0, 60) + '...';
+            document.getElementById('infoMovieId').textContent = movieId;
+
+            // Extract the NAS path from the first non-comment non-empty line
+            // Master playlist served by streaming-service still has the raw NAS path in the URI
+            const playlistLine = m3u8Text.split('\n').find(
+                l => l.trim() && !l.trim().startsWith('#')
+            ) || '—';
+
+            // Pull the path= param out of the rewritten URL, or show the raw line
+            const pathMatch = playlistLine.match(/path=([^&\s]+)/);
+            const nasPath = pathMatch
+                ? decodeURIComponent(pathMatch[1]).replace(/\/[^/]+$/, '/…')
+                : playlistLine.trim().substring(0, 60);
+
+            document.getElementById('infoNasPath').textContent = nasPath;
+            document.getElementById('infoSource').textContent =
+                `streaming-service :8084 → nas-orchestrator :8081`;
+            document.getElementById('infoLevel').textContent = 'Parsing manifest…';
         }
     </script>
 

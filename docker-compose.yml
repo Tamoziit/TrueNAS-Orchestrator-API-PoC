@@ -90,6 +90,22 @@ services:
     networks:
       - antar-network
 
+  # streaming-service
+  streaming-service:
+    build:
+      context: ./streaming-service
+    container_name: streaming-service
+    env_file:
+      - ./streaming-service/.env
+    ports:
+      - "8084:8084"
+    depends_on:
+      - redis
+      - kafka
+      - nas-orchestrator
+    networks:
+      - antar-network
+
 networks:
   antar-network:
     driver: bridge

@@ -1,14 +1,12 @@
 spring:
   application:
     name: streaming-service
-  config:
-    import: optional:file:.env[.properties]
   data:
     redis:
-      host: localhost
+      host: redis
       port: 6379
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: kafka:29092
     consumer:
       group-id: streaming-service-group
       auto-offset-reset: earliest
@@ -29,14 +27,12 @@ spring:
 server:
   port: 8084
 
-# AWS Config
-aws:
-  access-key: ${AWS_ACCESS_KEY:your-access-key}
-  secret-key: ${AWS_SECRET_KEY:your-secret-key}
-  region: ${AWS_REGION:your-region}
-  s3:
-    bucket-name: ${AWS_BUCKET_NAME:your-bucket-name}
-    presigned-url-expiry: 60
+nas:
+  orchestrator:
+    base-url: http://nas-orchestrator:8081
+
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5501}
 
 management:
   endpoints:

@@ -94,7 +94,15 @@ public class StreamingService {
                 continue;
             }
 
-            rewritten.append("/api/v1/nas-orchestrator/stream/segment?path=").append(basePath).append(trimmed).append("\n");
+            // Variant playlist references (e.g. 360p/playlist.m3u8 in a master playlist)
+            // must be routed to /stream/playlist so they get recursively rewritten.
+            // Segment files (.ts) go to /stream/segment for the cache+SMB read path.
+            String fullPath = basePath + trimmed;
+            if (trimmed.endsWith(".m3u8")) {
+                rewritten.append("/api/v1/nas-orchestrator/stream/playlist?path=").append(fullPath).append("\n");
+            } else {
+                rewritten.append("/api/v1/nas-orchestrator/stream/segment?path=").append(fullPath).append("\n");
+            }
         }
 
         return rewritten.toString();

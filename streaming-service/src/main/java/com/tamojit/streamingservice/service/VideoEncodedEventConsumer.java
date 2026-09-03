@@ -29,8 +29,8 @@ public class VideoEncodedEventConsumer {
         if (event.isSuccess()) {
             // storing master playlist in redis
             String cacheKey = MASTER_PLAYLIST_KEY_PREFIX + event.getMovieId();
-            redisTemplate.opsForValue().set(cacheKey, event.getMasterPlaylistKey());
-            log.info("Successfully cached playlist key for movie: {}", event.getMovieId());
+            redisTemplate.opsForValue().set(cacheKey, event.getMasterPlaylistPath());
+            log.info("Successfully cached playlist path for movie: {} → {}", event.getMovieId(), event.getMasterPlaylistPath());
         } else {
             log.error("Encoding failed for movie: {} - {}", event.getMovieId(), event.getErrorMessage());
         }

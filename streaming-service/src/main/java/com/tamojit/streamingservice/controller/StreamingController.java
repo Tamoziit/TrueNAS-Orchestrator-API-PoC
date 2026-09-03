@@ -1,6 +1,5 @@
 package com.tamojit.streamingservice.controller;
 
-import com.tamojit.streamingservice.dto.StreamingResponseDto;
 import com.tamojit.streamingservice.service.StreamingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,36 +17,28 @@ public class StreamingController {
 
     private static final String MASTER_PLAYLIST_KEY_PREFIX = "streaming:playlist:";
 
+    /**
+     * Resolves the movie's NAS-relative playlist path from Redis, then proxies
+     * the raw M3U8 content through from nas-orchestrator.
+     *
+     * Segment requests are NOT routed through streaming-service — the playlist
+     * returned by nas-orchestrator already rewrites segment URIs to point
+     * directly at /api/v1/nas-orchestrator/stream/segment, so the client
+     * fetches segments without touching this service again.
+     */
     @GetMapping("/{movieId}")
-    public ResponseEntity<StreamingResponseDto> getStreamingUrl(@PathVariable String movieId) {
-        log.info("Getting streaming url for {}", movieId);
+    public ResponseEntity<String> getPlaylist(@PathVariable String movieId) {
+        log.info("Playlist request for movieId: {}", movieId);
 
-        // Get master playlist key from Redis
-        String playlistKey = redisTemplate.opsForValue()
-            .get(MASTER_PLAYLIST_KEY_PREFIX + movieId);
-
-        log.info(playlistKey);
-        if (playlistKey == null) {
+        String playlistPath = redisTemplate.opsForValue().get(MASTER_PLAYLIST_KEY_PREFIX + movieId);
+        if (playlistPath == null) {
+            log.warn("No playlist registered for movieId: {}", movieId);
             return ResponseEntity.notFound().build();
         }
 
-        StreamingResponseDto responseDto = streamingService.getStreamingUrl(movieId, playlistKey);
-
-        return ResponseEntity.ok(responseDto);
-    }
-
-    // getting signed m3u8 HLS playlist for each quality
-    @GetMapping("/{movieId}/playlist")
-    public ResponseEntity<String> getSignedPlaylistUrl(
-        @PathVariable String movieId,
-        @RequestParam String path
-    ) {
-        log.info("Getting playlist url for {}", movieId);
-
-        String signedPlaylist = streamingService.getSignedPlaylist(movieId, path);
-
+        log.info("Proxying playlist for movieId: {} at path: {}", movieId, playlistPath);
         return ResponseEntity.ok()
             .header("Content-Type", "application/x-mpegURL")
-            .body(signedPlaylist);
+            .body(streamingService.getPlaylist(playlistPath));
     }
 }

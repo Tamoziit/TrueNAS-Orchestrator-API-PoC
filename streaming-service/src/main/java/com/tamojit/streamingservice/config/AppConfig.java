@@ -6,40 +6,22 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
-import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
-import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
-import software.amazon.awssdk.regions.Region;
-import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import org.springframework.web.client.RestClient;
 
 @Configuration
 public class AppConfig {
-    @Value("${aws.access-key}")
-    private String accessKey;
 
-    @Value("${aws.secret-key}")
-    private String secretKey;
+    @Value("${nas.orchestrator.base-url}")
+    private String nasOrchestratorBaseUrl;
 
-    @Value("${aws.region}")
-    private String region;
-
+    /**
+     * RestClient wired to nas-orchestrator — used by StreamingService to proxy
+     * playlist requests.
+     */
     @Bean
-    public S3Client s3Client() {
-        return S3Client.builder()
-            .region(Region.of(region))
-            .credentialsProvider(StaticCredentialsProvider.create(
-                AwsBasicCredentials.create(accessKey, secretKey)
-            ))
-            .build();
-    }
-
-    @Bean
-    public S3Presigner s3Presigner() {
-        return S3Presigner.builder()
-            .region(Region.of(region))
-            .credentialsProvider(StaticCredentialsProvider.create(
-                AwsBasicCredentials.create(accessKey, secretKey)
-            ))
+    public RestClient nasOrchestratorRestClient() {
+        return RestClient.builder()
+            .baseUrl(nasOrchestratorBaseUrl)
             .build();
     }
 
