@@ -24,7 +24,7 @@ public class NasOrchestratorClient {
     public void downloadToFile(String relativePath, Path destination) throws IOException {
         byte[] bytes = restClient.get()
             .uri(uriBuilder -> uriBuilder
-                .path("/api/v1/nas-orchestrator/files/preview")
+                .path("/api/v1/nas-orchestrator/files/download")
                 .queryParam("path", relativePath)
                 .build())
             .retrieve()
