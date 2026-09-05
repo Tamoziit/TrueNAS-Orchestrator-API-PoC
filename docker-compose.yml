@@ -10,6 +10,9 @@ services:
     container_name: redis-antar
     ports:
       - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --save 60 1 --loglevel warning
     networks:
       - antar-network
 
@@ -111,3 +114,6 @@ services:
 networks:
   antar-network:
     driver: bridge
+
+volumes:
+  redis-data:

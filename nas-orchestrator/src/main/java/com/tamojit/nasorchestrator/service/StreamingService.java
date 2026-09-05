@@ -54,21 +54,21 @@ public class StreamingService {
     public byte[] getSegment(String relativePath) {
         byte[] l1hit = l1.get(relativePath);
         if (l1hit != null) {
-            log.debug("L1 hit: {}", relativePath);
+            log.info("L1 hit: {}", relativePath);
             firePrefetch(relativePath);
             return l1hit;
         }
 
         byte[] l2hit = l2.get(relativePath);
         if (l2hit != null) {
-            log.debug("L2 hit: {}", relativePath);
+            log.info("L2 hit: {}", relativePath);
             l1.put(relativePath, l2hit); // promote to L1
             firePrefetch(relativePath);
             return l2hit;
         }
 
         // L1 & L2 miss -> SMB fetch
-        log.debug("Cache miss, reading SMB: {}", relativePath);
+        log.info("Cache miss, reading SMB: {}", relativePath);
         byte[] data = readFromSmb(relativePath);
         l1.put(relativePath, data);
         l2.put(relativePath, data);
